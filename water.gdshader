@@ -3,9 +3,11 @@ shader_type spatial;
 // Water properties
 uniform vec3 absorption_color : source_color = vec3(1.0, 0.533, 0);
 uniform float absorption_scale : hint_range(0.0, 1.0) = 0.2;
+uniform vec3 scattering_color : source_color = vec3(0.0, 0.767, 1.0);
+uniform float scattering_scale : hint_range(0.0, 1.0) = 0.1;
 
 // Wave properties
-uniform float wave_speed : hint_range(0.0, 2.0) = 0.5;
+uniform float wave_speed : hint_range(0.0, 10.0) = 2.5;
 uniform float wave_amplitude : hint_range(0.0, 0.3) = 0.05;
 uniform float wave_frequency : hint_range(0.1, 5.0) = 1.0;
 
@@ -47,8 +49,12 @@ void fragment() {
 	float linear_depth = view.z;
 	float water_depth = VERTEX.z - linear_depth;
 
+	vec3 absorption = absorption_color * water_depth * absorption_scale;
+	vec3 scattering = scattering_color * clamp(water_depth, 0.0, 1.0) * scattering_scale;
+
 	vec3 color = texture(screen_texture, SCREEN_UV).rgb;
-	color = clamp(color - absorption_color * water_depth * absorption_scale, 0.0, 1.0);
+	color = clamp(color - absorption, 0.0, 1.0);
+	color = clamp(color + scattering, 0.0, 1.0);
 
 	ALBEDO = color;
 	ROUGHNESS = 0.1;
