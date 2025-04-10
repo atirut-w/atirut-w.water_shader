@@ -5,6 +5,7 @@ uniform vec3 absorption_color : source_color = vec3(1.0, 0.533, 0);
 uniform float absorption_scale : hint_range(0.0, 1.0) = 0.2;
 uniform vec3 scattering_color : source_color = vec3(0.0, 0.767, 1.0);
 uniform float scattering_scale : hint_range(0.0, 1.0) = 0.1;
+uniform float refraction_strength : hint_range(0.0, 0.1) = 0.02;
 
 // Wave properties
 uniform float wave_speed : hint_range(0.0, 10.0) = 2.5;
@@ -37,25 +38,29 @@ void vertex() {
 }
 
 void fragment() {
-	float depth = texture(depth_texture, SCREEN_UV).r;
-
+	vec2 refraction_offset = NORMAL.xy * refraction_strength;
+	vec2 refracted_uv = clamp(SCREEN_UV + refraction_offset, 0.0, 1.0);
+	
+	float depth = texture(depth_texture, refracted_uv).r;
+	
 #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
-	vec3 ndc = vec3(SCREEN_UV, depth) * 2.0 - 1.0;
+	vec3 ndc = vec3(refracted_uv, depth) * 2.0 - 1.0;
 #else
-	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth);
+	vec3 ndc = vec3(refracted_uv * 2.0 - 1.0, depth);
 #endif
 	vec4 view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
 	view.xyz /= view.w;
 	float linear_depth = view.z;
 	float water_depth = VERTEX.z - linear_depth;
-
+	water_depth = max(water_depth, 0.0);
+	
 	vec3 absorption = absorption_color * water_depth * absorption_scale;
 	vec3 scattering = scattering_color * clamp(water_depth, 0.0, 1.0) * scattering_scale;
-
-	vec3 color = texture(screen_texture, SCREEN_UV).rgb;
+	
+	vec3 color = texture(screen_texture, refracted_uv).rgb;
 	color = clamp(color - absorption, 0.0, 1.0);
 	color = clamp(color + scattering, 0.0, 1.0);
-
+	
 	ALBEDO = color;
 	ROUGHNESS = 0.1;
 }
