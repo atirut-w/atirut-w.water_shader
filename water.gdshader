@@ -12,6 +12,10 @@ uniform float wave_speed : hint_range(0.0, 10.0) = 2.5;
 uniform float wave_amplitude : hint_range(0.0, 0.3) = 0.05;
 uniform float wave_frequency : hint_range(0.1, 5.0) = 1.0;
 
+// Visibility properties
+uniform float visibility_distance : hint_range(1.0, 100.0) = 20.0;
+uniform float visibility_fade_power : hint_range(0.1, 10.0) = 2.0;
+
 uniform sampler2D screen_texture : hint_screen_texture, repeat_disable;
 uniform sampler2D depth_texture : hint_depth_texture, repeat_disable;
 
@@ -59,8 +63,13 @@ void fragment() {
 	vec3 scattering = scattering_color * clamp(water_depth, 0.0, 1.0) * scattering_scale;
 	
 	vec3 color = texture(screen_texture, refracted_uv).rgb;
+	vec3 deep_water_color = vec3(0.0) * absorption + scattering;
+	
 	color = color * absorption;
 	color = clamp(color + scattering, 0.0, 1.0);
+
+	float visibility_factor = 1.0 - clamp(pow(water_depth / visibility_distance, visibility_fade_power), 0.0, 1.0);
+	color = mix(deep_water_color, color, visibility_factor);
 	
 	ALBEDO = color;
 	ROUGHNESS = 0.1;

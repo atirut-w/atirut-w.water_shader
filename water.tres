@@ -13,3 +13,5 @@ shader_parameter/refraction_strength = 0.02
 shader_parameter/wave_speed = 2.5
 shader_parameter/wave_amplitude = 0.05
 shader_parameter/wave_frequency = 1.0
+shader_parameter/visibility_distance = 20.0
+shader_parameter/visibility_fade_power = 2.0
