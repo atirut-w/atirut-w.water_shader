@@ -4,7 +4,8 @@ shader_type spatial;
 uniform vec3 absorption_color : source_color = vec3(1.0, 0.533, 0);
 uniform float absorption_scale : hint_range(0.0, 1.0) = 0.2;
 uniform vec3 scattering_color : source_color = vec3(0.0, 0.767, 1.0);
-uniform float scattering_scale : hint_range(0.0, 1.0) = 0.1;
+uniform float scattering_scale : hint_range(0.0, 0.01) = 0.005;
+uniform float scattering_phase : hint_range(0.0, 1.0) = 0.5; // Controls directionality of scattering
 uniform float refraction_strength : hint_range(0.0, 0.1) = 0.02;
 
 // Wave properties
@@ -14,7 +15,7 @@ uniform float wave_frequency : hint_range(0.1, 5.0) = 1.0;
 
 // Visibility properties
 uniform float visibility_distance : hint_range(1.0, 100.0) = 20.0;
-uniform float visibility_fade_power : hint_range(0.1, 10.0) = 2.0;
+uniform float visibility_fade_power : hint_range(0.1, 10.0) = 0.5;
 
 uniform sampler2D screen_texture : hint_screen_texture, repeat_disable;
 uniform sampler2D depth_texture : hint_depth_texture, repeat_disable;
@@ -58,12 +59,15 @@ void fragment() {
 	float water_depth = VERTEX.z - linear_depth;
 	water_depth = max(water_depth, 0.0);
 	
-	// Apply Beer's Law for absorption
 	vec3 absorption = exp(-absorption_color * water_depth * absorption_scale);
-	vec3 scattering = scattering_color * clamp(water_depth, 0.0, 1.0) * scattering_scale;
 	
+	// Phase function approximation (simplified Henyey-Greenstein)
+	float view_dot_normal = max(dot(VIEW, NORMAL), 0.0);
+	float phase = mix(1.0, view_dot_normal, scattering_phase);
+	
+	vec3 scattering = scattering_color * (1.0 - exp(-water_depth * scattering_scale)) * phase;
 	vec3 color = texture(screen_texture, refracted_uv).rgb;
-	vec3 deep_water_color = vec3(0.0) * absorption + scattering;
+	vec3 deep_water_color = scattering_color * (1.0 - exp(-visibility_distance * scattering_scale));
 	
 	color = color * absorption;
 	color = clamp(color + scattering, 0.0, 1.0);
