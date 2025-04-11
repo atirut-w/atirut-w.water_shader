@@ -54,11 +54,12 @@ void fragment() {
 	float water_depth = VERTEX.z - linear_depth;
 	water_depth = max(water_depth, 0.0);
 	
-	vec3 absorption = absorption_color * water_depth * absorption_scale;
+	// Apply Beer's Law for absorption
+	vec3 absorption = exp(-absorption_color * water_depth * absorption_scale);
 	vec3 scattering = scattering_color * clamp(water_depth, 0.0, 1.0) * scattering_scale;
 	
 	vec3 color = texture(screen_texture, refracted_uv).rgb;
-	color = clamp(color - absorption, 0.0, 1.0);
+	color = color * absorption;
 	color = clamp(color + scattering, 0.0, 1.0);
 	
 	ALBEDO = color;
