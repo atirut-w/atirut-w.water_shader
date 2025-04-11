@@ -75,6 +75,9 @@ void fragment() {
 	float visibility_factor = 1.0 - clamp(pow(water_depth / visibility_distance, visibility_fade_power), 0.0, 1.0);
 	color = mix(deep_water_color, color, visibility_factor);
 	
-	ALBEDO = color;
+	// We need to set albedo to 0 and emission to the color because otherwise,
+	// lights that only reach the surface will still affect underwater things.
+	ALBEDO = vec3(0);
+	EMISSION = color;
 	ROUGHNESS = 0.1;
 }
