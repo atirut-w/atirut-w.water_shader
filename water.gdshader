@@ -2,22 +2,17 @@ shader_type spatial;
 
 // Water properties
 uniform vec3 absorption_color : source_color = vec3(1.0, 0.533, 0);
-uniform float absorption_scale : hint_range(0.0, 1.0) = 0.2;
-uniform vec3 scattering_color : source_color = vec3(0.0, 0.767, 1.0);
-uniform float scattering_scale : hint_range(0.0, 0.01) = 0.005;
-uniform float scattering_phase : hint_range(0.0, 1.0) = 0.5; // Controls directionality of scattering
-uniform float refraction_strength : hint_range(0.0, 0.1) = 0.02;
+uniform float concentration : hint_range(0.0, 10.0) = 1.0; // Concentration of the water
+uniform float fog_density : hint_range(0.0, 1.0) = 0.5; // Density of the fog
+uniform float scatter_power : hint_range(0.0, 1.0) = 0.25; // Power of the scattering effect
+uniform float anisotropy : hint_range(-1.0, 1.0) = 0.5; // Anisotropy of the scattering
 
 // Wave properties
 uniform float wave_speed : hint_range(0.0, 10.0) = 2.5;
 uniform float wave_amplitude : hint_range(0.0, 0.3) = 0.05;
 uniform float wave_frequency : hint_range(0.1, 5.0) = 1.0;
 
-// Visibility properties
-uniform float visibility_distance : hint_range(1.0, 100.0) = 20.0;
-uniform float visibility_fade_power : hint_range(0.1, 10.0) = 0.5;
-
-uniform sampler2D screen_texture : hint_screen_texture, repeat_disable;
+uniform sampler2D screen_texture : hint_screen_texture, source_color, repeat_disable;
 uniform sampler2D depth_texture : hint_depth_texture, repeat_disable;
 
 void vertex() {
@@ -42,42 +37,50 @@ void vertex() {
 	));
 }
 
-void fragment() {
-	vec2 refraction_offset = NORMAL.xy * refraction_strength;
-	vec2 refracted_uv = clamp(SCREEN_UV + refraction_offset, 0.0, 1.0);
-	
-	float depth = texture(depth_texture, refracted_uv).r;
-	
+vec3 get_pixel_coordinates(vec2 uv, mat4 inv_projection_matrix) {
+	float depth = texture(depth_texture, uv).r;
 #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
-	vec3 ndc = vec3(refracted_uv, depth) * 2.0 - 1.0;
+	vec3 ndc = vec3(uv, depth) * 2.0 - 1.0;
 #else
-	vec3 ndc = vec3(refracted_uv * 2.0 - 1.0, depth);
+	vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
 #endif
-	vec4 view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
+	vec4 view = inv_projection_matrix * vec4(ndc, 1.0);
 	view.xyz /= view.w;
-	float linear_depth = view.z;
-	float water_depth = VERTEX.z - linear_depth;
-	water_depth = max(water_depth, 0.0);
-	
-	vec3 absorption = exp(-absorption_color * water_depth * absorption_scale);
-	
-	// Phase function approximation (simplified Henyey-Greenstein)
-	float view_dot_normal = max(dot(VIEW, NORMAL), 0.0);
-	float phase = mix(1.0, view_dot_normal, scattering_phase);
-	
-	vec3 scattering = scattering_color * (1.0 - exp(-water_depth * scattering_scale)) * phase;
-	vec3 color = texture(screen_texture, refracted_uv).rgb;
-	vec3 deep_water_color = scattering_color * (1.0 - exp(-visibility_distance * scattering_scale));
-	
-	color = color * absorption;
-	color = clamp(color + scattering, 0.0, 1.0);
+	return view.xyz;
+}
 
-	float visibility_factor = 1.0 - clamp(pow(water_depth / visibility_distance, visibility_fade_power), 0.0, 1.0);
-	color = mix(deep_water_color, color, visibility_factor);
-	
-	// We need to set albedo to 0 and emission to the color because otherwise,
-	// lights that only reach the surface will still affect underwater things.
-	ALBEDO = vec3(0);
-	EMISSION = color;
+void fragment() {
+	float depth = VERTEX.z - get_pixel_coordinates(SCREEN_UV, INV_PROJECTION_MATRIX).z;
+	vec3 transmittance = exp(-absorption_color * depth * concentration);
+	float fog_mask = 1.0 - exp(-fog_density * depth);
+
+	// TODO: Refraction effect
+	vec3 underwater_color = texture(screen_texture, SCREEN_UV).rgb;
+	underwater_color *= transmittance;
+	underwater_color = mix(underwater_color, vec3(0.0), fog_mask);
+
+	// Unconventional, but here's the idea: instead of using the albedo to
+	// output what's underwater, we use the emission channel, which is unlit.
+	// This way, the underwater is lit more realistically.
+	ALBEDO = vec3(1) - absorption_color;
+	EMISSION = vec3(underwater_color); // TODO: Absorption color
 	ROUGHNESS = 0.1;
+}
+
+void light() {
+	float cosTheta = dot(VIEW, -LIGHT);
+	float phase = (1.0 - anisotropy * anisotropy) / pow(1.0 + anisotropy * anisotropy - 2.0 * anisotropy * cosTheta, 1.5);
+	phase *= 0.25 / PI;
+
+	DIFFUSE_LIGHT += phase * ATTENUATION * LIGHT_COLOR * scatter_power;
+
+	// I literally just copied this from the Godot source code because they
+	// did not document how to do the specular blob in a custom light function.
+	vec3 H = normalize(VIEW + LIGHT);
+	float cNdotH = max(dot(NORMAL, H), 0.0);
+	float cNdotL = max(dot(NORMAL, LIGHT), 0.0);
+	float shininess = exp2(15.0 * (1.0 - clamp(ROUGHNESS, 0.01, 1.0)) + 1.0) * 0.25;
+	float blinn = pow(cNdotH, shininess) * cNdotL;
+	blinn *= (shininess + 8.0) * (1.0 / (8.0 * PI));
+	SPECULAR_LIGHT += LIGHT_COLOR * blinn * ATTENUATION;
 }
