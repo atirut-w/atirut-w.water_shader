@@ -1,6 +1,9 @@
 shader_type spatial;
+render_mode world_vertex_coords;
 
 // Water properties
+uniform sampler2D normal_texture : hint_normal;
+uniform float normal_scale = 1.0;
 uniform vec3 absorption_color : source_color = vec3(1.0, 0.533, 0);
 uniform float concentration : hint_range(0.0, 10.0) = 1.0; // Concentration of the water
 uniform float fog_density : hint_range(0.0, 1.0) = 0.5; // Density of the fog
