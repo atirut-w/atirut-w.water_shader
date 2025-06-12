@@ -2,8 +2,9 @@ shader_type spatial;
 render_mode world_vertex_coords;
 
 // Water properties
-uniform sampler2D normal_texture : hint_normal;
-uniform float normal_scale = 1.0;
+uniform sampler2D normal_texture : hint_normal; // Normal map for water surface
+uniform float normal_scale = 0.25; // Scale of the normal map
+uniform float normal_speed = 0.5; // Speed of the normal map animation
 uniform vec3 absorption_color : source_color = vec3(1.0, 0.533, 0);
 uniform float concentration : hint_range(0.0, 10.0) = 1.0; // Concentration of the water
 uniform float fog_density : hint_range(0.0, 1.0) = 0.5; // Density of the fog
@@ -18,6 +19,8 @@ uniform float wave_frequency : hint_range(0.1, 5.0) = 1.0;
 uniform sampler2D screen_texture : hint_screen_texture, source_color, repeat_disable;
 uniform sampler2D depth_texture : hint_depth_texture, repeat_disable;
 
+varying vec3 world_coords;
+
 void vertex() {
 	// More complex wave animation with multiple frequencies
 	float time = TIME * wave_speed;
@@ -31,6 +34,7 @@ void vertex() {
 				sin(VERTEX.z * wave_frequency * 1.8 + time * 0.9) * wave_amplitude * 0.3;
 
 	VERTEX.y += wave1 + wave2;
+	world_coords = VERTEX;
 
 	// Adjust normals for lighting
 	NORMAL = normalize(vec3(
@@ -57,16 +61,23 @@ void fragment() {
 	vec3 transmittance = exp(-absorption_color * depth * concentration);
 	float fog_mask = 1.0 - exp(-fog_density * depth);
 
+	// TODO: Probably improve this
+	vec2 normal_uv = world_coords.xz * normal_scale;
+	vec3 normal1 = texture(normal_texture, normal_uv + vec2(TIME * normal_speed, 0.0) * normal_scale).rgb;
+	vec3 normal2 = texture(normal_texture, normal_uv + vec2(0.0, TIME * normal_speed / 2.0) * normal_scale).rgb;
+	vec3 normal = normal1 * 0.5 + normal2 * 0.5;
+	NORMAL_MAP = normal;
+
 	// TODO: Refraction effect
 	vec3 underwater_color = texture(screen_texture, SCREEN_UV).rgb;
 	underwater_color *= transmittance;
 	underwater_color = mix(underwater_color, vec3(0.0), fog_mask);
+	EMISSION = vec3(underwater_color);
 
 	// Unconventional, but here's the idea: instead of using the albedo to
 	// output what's underwater, we use the emission channel, which is unlit.
 	// This way, the underwater is lit independently of the surface lighting.
 	ALBEDO = vec3(1) - absorption_color;
-	EMISSION = vec3(underwater_color); // TODO: Absorption color
 	ROUGHNESS = 0.1;
 }
 
