@@ -61,7 +61,7 @@ void fragment() {
 
 	// Unconventional, but here's the idea: instead of using the albedo to
 	// output what's underwater, we use the emission channel, which is unlit.
-	// This way, the underwater is lit more realistically.
+	// This way, the underwater is lit independently of the surface lighting.
 	ALBEDO = vec3(1) - absorption_color;
 	EMISSION = vec3(underwater_color); // TODO: Absorption color
 	ROUGHNESS = 0.1;
