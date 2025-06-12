@@ -50,7 +50,7 @@ vec3 get_pixel_coordinates(vec2 uv, mat4 inv_projection_matrix) {
 }
 
 void fragment() {
-	float depth = VERTEX.z - get_pixel_coordinates(SCREEN_UV, INV_PROJECTION_MATRIX).z;
+	float depth = max(0.0, VERTEX.z - get_pixel_coordinates(SCREEN_UV, INV_PROJECTION_MATRIX).z);
 	vec3 transmittance = exp(-absorption_color * depth * concentration);
 	float fog_mask = 1.0 - exp(-fog_density * depth);
 
