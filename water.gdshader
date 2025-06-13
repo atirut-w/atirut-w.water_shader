@@ -81,6 +81,12 @@ void fragment() {
 	ROUGHNESS = 0.1;
 }
 
+float roughness_to_shininess(float roughness) {
+	float r = 1.2 - roughness;
+	float r2 = r * r;
+	return r * r2 * r2 * 2000.0;
+}
+
 void light() {
 	float cosTheta = dot(VIEW, -LIGHT);
 	float phase = (1.0 - anisotropy * anisotropy) / pow(1.0 + anisotropy * anisotropy - 2.0 * anisotropy * cosTheta, 1.5);
@@ -90,11 +96,18 @@ void light() {
 
 	// I literally just copied this from the Godot source code because they
 	// did not document how to do the specular blob in a custom light function.
+	// Source: https://github.com/godotengine/godot/blob/d50381065445e04b5c1af9992fa0a0b8fcfe49b0/drivers/gles3/shaders/scene.glsl#L353
+	float NdotL = min(dot(NORMAL, LIGHT), 1.0);
+	float cNdotL = max(NdotL, 0.0);
+	float specular_brdf_NL = 0.0;
+	// Normalized blinn always unless disabled.
 	vec3 H = normalize(VIEW + LIGHT);
-	float cNdotH = max(dot(NORMAL, H), 0.0);
-	float cNdotL = max(dot(NORMAL, LIGHT), 0.0);
-	float shininess = exp2(15.0 * (1.0 - clamp(ROUGHNESS, 0.01, 1.0)) + 1.0) * 0.25;
-	float blinn = pow(cNdotH, shininess) * cNdotL;
-	blinn *= (shininess + 8.0) * (1.0 / (8.0 * PI));
-	SPECULAR_LIGHT += LIGHT_COLOR * blinn * ATTENUATION;
+	float cNdotH = clamp(dot(NORMAL, H), 0.0, 1.0);
+	float shininess = roughness_to_shininess(ROUGHNESS);
+	float blinn = pow(cNdotH, shininess);
+	blinn *= (shininess + 2.0) * (1.0 / (8.0 * PI)) * cNdotL;
+	specular_brdf_NL = blinn;
+	// HACK: The divide isn't originally in the Godot source code, but the
+	// resulting specular light is way too strong without it.
+	SPECULAR_LIGHT += specular_brdf_NL * ATTENUATION * LIGHT_COLOR / 10.0;
 }
