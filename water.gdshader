@@ -5,7 +5,7 @@ render_mode world_vertex_coords;
 uniform sampler2D normal_texture : hint_normal; // Normal map for water surface
 uniform float normal_scale = 0.25; // Scale of the normal map
 uniform float normal_speed = 0.5; // Speed of the normal map animation
-uniform vec3 absorption_color : source_color = vec3(1.0, 0.533, 0);
+uniform vec3 absorption_color : source_color = vec3(1.0, 0.8, 0);
 uniform float concentration : hint_range(0.0, 10.0) = 1.0; // Concentration of the water
 uniform float fog_density : hint_range(0.0, 1.0) = 0.5; // Density of the fog
 uniform float scatter_power : hint_range(0.0, 1.0) = 0.25; // Power of the scattering effect
