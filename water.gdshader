@@ -6,8 +6,7 @@ uniform sampler2D normal_texture : hint_normal; // Normal map for water surface
 uniform float normal_scale = 0.25; // Scale of the normal map
 uniform float normal_speed = 0.5; // Speed of the normal map animation
 uniform vec3 absorption_color : source_color = vec3(1.0, 0.8, 0);
-uniform float concentration : hint_range(0.0, 10.0) = 1.0; // Concentration of the water
-uniform float fog_density : hint_range(0.0, 1.0) = 0.5; // Density of the fog
+uniform float concentration : hint_range(0.01, 10.0) = 1.0; // Concentration of the water
 uniform float scatter_power : hint_range(0.0, 1.0) = 0.25; // Power of the scattering effect
 uniform float anisotropy : hint_range(-1.0, 1.0) = 0.5; // Anisotropy of the scattering
 
@@ -58,8 +57,8 @@ vec3 get_pixel_coordinates(vec2 uv, mat4 inv_projection_matrix) {
 
 void fragment() {
 	float depth = max(0.0, VERTEX.z - get_pixel_coordinates(SCREEN_UV, INV_PROJECTION_MATRIX).z);
-	vec3 transmittance = exp(-absorption_color * depth * concentration);
-	float fog_mask = 1.0 - exp(-fog_density * depth);
+	vec3 transmittance = exp(-absorption_color * concentration * depth);
+	float fog_mask = 1.0 - exp(-concentration * depth);
 
 	// TODO: Probably improve this
 	vec2 normal_uv = world_coords.xz * normal_scale;
